@@ -1,4 +1,5 @@
 #include <libcouchbase/couchbase.h>
+#include <libcouchbase/n1ql.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
