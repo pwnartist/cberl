@@ -120,6 +120,12 @@ handle_call({cntl, Mode, Cmd, Value}, _From, State) ->
         {error, _} = E -> {false, E}
     end,
     {reply, Reply, State#instance{connected = Connected}};
+handle_call({n1ql, Query, Params, Prepared, TranscoderOpts}, _From, State) ->
+    {Connected, Reply} = case connect(State) of
+                             ok -> {true, n1ql(Query, Params, Prepared, TranscoderOpts, State)};
+                             {error, _} = E -> {false, E}
+                         end,
+    {reply, Reply, State#instance{connected = Connected}};
 handle_call(bucketname, _From, State = #instance{bucketname = BucketName}) ->
     {reply, {ok, BucketName}, State};
 handle_call(_Request, _From, State) ->
@@ -250,6 +256,19 @@ http(Path, Body, ContentType, Method, Chunked, #instance{handle = Handle}) ->
         Reply -> Reply
     end.
 
+n1ql(Query, Params, Prepared, TranscoderOpts, #instance{handle = Handle, transcoder = Transcoder}) ->
+	Flag = Transcoder:flag(TranscoderOpts),
+    ok = cberl_nif:control(Handle, op(n1ql), [Query, Params, Prepared]),
+    receive
+        {error, Error} -> {error, Error};
+        {ok, MetaBin, Results} ->
+            Data = lists:map(fun(Result) ->
+                                     Transcoder:decode_value(Flag, Result)
+                             end, Results),
+            Meta = Transcoder:decode_value(Flag, MetaBin),
+            {ok, Meta, Data}
+    end.
+
 cntl(Mode, Cmd, Value, #instance{handle = Handle}) ->
     ok = cberl_nif:control(Handle, op(cntl), [Mode, Cmd, Value]),
     receive
@@ -272,6 +291,7 @@ op(mtouch) -> ?'CMD_MTOUCH';
 op(arithmetic) -> ?'CMD_ARITHMETIC';
 op(remove) -> ?'CMD_REMOVE';
 op(http) -> ?'CMD_HTTP';
+op(n1ql) -> ?'CMD_N1QL';
 op(cntl) -> ?'CMD_CNTL'.
 
 -spec canonical_bucket_name(string()) -> string().
