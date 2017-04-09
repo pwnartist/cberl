@@ -733,13 +733,11 @@ void* cb_n1ql_args(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         for(f = 0; f < i; f++) {
             free(args->params[f]);
         }
-        free(args->query);
         free(args->params);
         free(args->nparams);
         free(currParam);
     error1:
         free(args->query);
-        enif_free(args);
     error0:
         enif_free(args);
 
@@ -773,15 +771,7 @@ ERL_NIF_TERM cb_n1ql(ErlNifEnv* env, handle_t* handle, void* obj)
 
     if ((ret = lcb_n1p_mkcmd(params, &cmd)) != LCB_SUCCESS) goto error1;
     if ((ret = lcb_n1ql_query(handle->instance, &cb, &cmd)) != LCB_SUCCESS) goto error1;
-    lcb_n1p_free(params);
     lcb_wait(handle->instance);
-
-    for(f = 0; f < args->numparams; f++) {
-        free(args->params[f]);
-    }
-    free(args->query);
-    free(args->params);
-    free(args->nparams);
 
     ERL_NIF_TERM* results;
     ErlNifBinary databin;
@@ -793,8 +783,6 @@ ERL_NIF_TERM cb_n1ql(ErlNifEnv* env, handle_t* handle, void* obj)
     enif_alloc_binary(cb.meta->size, &databin);
     memcpy(databin.data, cb.meta->data, cb.meta->size);
     metaValue = enif_make_binary(env, &databin);
-    free(cb.meta->data);
-    free(cb.meta);
 
     int i = 0;
     for(; i < cb.currrow; i++) {
@@ -809,31 +797,22 @@ ERL_NIF_TERM cb_n1ql(ErlNifEnv* env, handle_t* handle, void* obj)
         free(cb.ret[i]->data);
         free(cb.ret[i]);
     }
-    free(cb.ret);
 
     returnValue = enif_make_list_from_array(env, results, cb.currrow);
+
     free(results);
+    free(cb.meta->data);
+    free(cb.meta);
+    free(cb.ret);
+    lcb_n1p_free(params);
     return enif_make_tuple3(env, A_OK(env), metaValue, returnValue);
 
-    error0:
-        free(args->query);
-        free(args->params);
-        free(args->nparams);
-        lcb_n1p_free(params);
-        for(f = 0; f < args->numparams; f++) {
-            free(args->params[f]);
-        }
     error1:
-        free(cb.meta->data);
         free(cb.meta);
         free(cb.ret);
-        free(args->query);
-        free(args->params);
-        free(args->nparams);
+
+    error0:
         lcb_n1p_free(params);
-        for(f = 0; f < args->numparams; f++) {
-            free(args->params[f]);
-        }
 
     return return_lcb_error(env, ret);
 }
