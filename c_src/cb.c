@@ -763,59 +763,78 @@ ERL_NIF_TERM cb_n1ql(ErlNifEnv* env, handle_t* handle, void* obj)
         if ((ret = lcb_n1p_posparam(params, args->params[f], args->nparams[f])) != LCB_SUCCESS) goto error0;
     }
 
-    cb.currrow = 0;
-    cb.size = 5;
-    cb.ret = malloc(sizeof(struct libcouchbase_callback*) * 1);
-    cb.meta = malloc(sizeof(struct libcouchbase_callback*) * 1);
+    cb.size = 0;
+    cb.ret_head = NULL;
+    cb.ret_curr = NULL;
+    cb.meta = NULL;
     cmd.callback = n1ql_callback;
 
-    if ((ret = lcb_n1p_mkcmd(params, &cmd)) != LCB_SUCCESS) goto error1;
-    if ((ret = lcb_n1ql_query(handle->instance, &cb, &cmd)) != LCB_SUCCESS) goto error1;
-    lcb_wait(handle->instance);
+    if ((ret = lcb_n1p_mkcmd(params, &cmd)) != LCB_SUCCESS) goto error0;
+    if ((ret = lcb_n1ql_query(handle->instance, &cb, &cmd)) != LCB_SUCCESS) goto error0;
+    if ((ret = lcb_wait(handle->instance)) != LCB_SUCCESS) goto error0;
 
     ERL_NIF_TERM* results;
     ErlNifBinary databin;
     ERL_NIF_TERM metaValue;
     ERL_NIF_TERM returnValue;
-    results = malloc(sizeof(ERL_NIF_TERM) * cb.currrow);
 
-    // Add meta data section
-    enif_alloc_binary(cb.meta->size, &databin);
+    if(!enif_alloc_binary(cb.meta->size, &databin)) goto error1;
+
     memcpy(databin.data, cb.meta->data, cb.meta->size);
     metaValue = enif_make_binary(env, &databin);
 
-    int i = 0;
-    for(; i < cb.currrow; i++) {
-        if (cb.ret[i]->error == LCB_SUCCESS) {
-            enif_alloc_binary(cb.ret[i]->size, &databin);
-            memcpy(databin.data, cb.ret[i]->data, cb.ret[i]->size);
-            results[i] = enif_make_binary(env, &databin);
-        } else {
-            results[i] = enif_make_tuple1(env,
-                    return_lcb_error(env, cb.ret[i]->error));
-        }
-        free(cb.ret[i]->data);
-        free(cb.ret[i]);
+    struct libcouchbase_callback* curr;
+
+    results = malloc(sizeof(ERL_NIF_TERM) * cb.size);
+    curr = cb.ret_head;
+
+    int i=0;
+    while(curr){
+        enif_alloc_binary(curr->size, &databin);
+        memcpy(databin.data, curr->data, curr->size);
+        results[i] = enif_make_binary(env, &databin);
+        curr = curr->next;
+        i++;
     }
 
-    returnValue = enif_make_list_from_array(env, results, cb.currrow);
+    returnValue = enif_make_list_from_array(env, results, cb.size);
 
     free(results);
-    free(cb.meta->data);
-    free(cb.meta);
-    free(cb.ret);
-    lcb_n1p_free(params);
+    while(cb.ret_curr) {
+        struct libcouchbase_callback* node;
+        node = cb.ret_curr->prev;
+        free(cb.ret_curr->data);
+        free(cb.ret_curr);
+        cb.ret_curr = node;
+    }
+    if(cb.meta) {
+        free(cb.meta->data);
+        free(cb.meta);
+        cb.meta=NULL;
+    }
+
     return enif_make_tuple3(env, A_OK(env), metaValue, returnValue);
 
-    error1:
+error1:
+    while(cb.ret_curr) {
+        struct libcouchbase_callback* node;
+        node = cb.ret_curr->prev;
+        free(cb.ret_curr->data);
+        free(cb.ret_curr);
+        cb.ret_curr = node;
+    }
+    if(cb.meta) {
+        free(cb.meta->data);
         free(cb.meta);
-        free(cb.ret);
+        cb.meta=NULL;
+    }
 
-    error0:
-        lcb_n1p_free(params);
+error0:
+    lcb_n1p_free(params);
 
     return return_lcb_error(env, ret);
 }
+
 
 ERL_NIF_TERM return_lcb_error(ErlNifEnv* env, int const value) {
     switch (value) {

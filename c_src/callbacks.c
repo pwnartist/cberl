@@ -116,27 +116,31 @@ void http_callback(lcb_http_request_t request,
 }
 
 void n1ql_callback(lcb_t instance,
-					int cbtype,
-					const lcb_RESPN1QL *resp)
+                   int cbtype,
+                   const lcb_RESPN1QL *resp)
 {
-	struct libcouchbase_callback_n1ql *cb;
-	cb = (struct libcouchbase_callback_n1ql *) ((lcb_RESPBASE *)resp)->cookie;
+    struct libcouchbase_callback_n1ql *cb;
+    struct libcouchbase_callback* node;
+    cb = (struct libcouchbase_callback_n1ql *) ((lcb_RESPBASE *)resp)->cookie;
 
-	if (! (resp->rflags & LCB_RESP_F_FINAL)) {
-		if (cb->currrow == cb->size) {
-			cb->size *= 2;
-			cb->ret = realloc(cb->ret, sizeof(struct libcouchbase_callback*) * cb->size);
-		}
+    node = calloc(1, sizeof(struct libcouchbase_callback));
+    node->data = calloc(resp->nrow+1,sizeof(char));
+    node->size = resp->nrow;
+    memcpy(node->data, resp->row, resp->nrow);
+    node->next = NULL;
+    node->prev = NULL;
 
-		cb->ret[cb->currrow] = malloc(sizeof(struct libcouchbase_callback));
-		cb->ret[cb->currrow]->data = malloc(resp->nrow);
-		cb->ret[cb->currrow]->size = resp->nrow;
-		memcpy(cb->ret[cb->currrow]->data, resp->row, resp->nrow);
-		cb->ret[cb->currrow]->error = LCB_SUCCESS;
-		cb->currrow++;
-	} else {
-		cb->meta->data = malloc(resp->nrow);
-		cb->meta->size = resp->nrow;
-		memcpy(cb->meta->data, resp->row, resp->nrow);
-	}
+    if (! (resp->rflags & LCB_RESP_F_FINAL)) {
+        if(cb->size ==0) {
+            cb->ret_head = node;
+            cb->ret_curr = node;
+        } else {
+            node->prev = cb->ret_curr;
+            cb->ret_curr->next = node;
+            cb->ret_curr = node;
+        }
+        cb->size += 1;
+    } else {
+        cb->meta = node;
+    }
 }
