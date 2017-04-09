@@ -4,7 +4,7 @@
 struct libcouchbase_callback {
     lcb_error_t error;
     size_t size;
-    char *data;
+    void *data;
     void *key;
     size_t nkey;
     lcb_uint32_t flag;
