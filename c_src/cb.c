@@ -783,7 +783,7 @@ ERL_NIF_TERM cb_n1ql(ErlNifEnv* env, handle_t* handle, void* obj)
     memcpy(databin.data, cb.meta->data, cb.meta->size);
     metaValue = enif_make_binary(env, &databin);
 
-    struct libcouchbase_callback* curr;
+    struct libcouchbase_callback_n1ql_data* curr;
 
     results = malloc(sizeof(ERL_NIF_TERM) * cb.size);
     curr = cb.ret_head;
@@ -801,7 +801,7 @@ ERL_NIF_TERM cb_n1ql(ErlNifEnv* env, handle_t* handle, void* obj)
 
     free(results);
     while(cb.ret_curr) {
-        struct libcouchbase_callback* node;
+        struct libcouchbase_callback_n1ql_data* node;
         node = cb.ret_curr->prev;
         free(cb.ret_curr->data);
         free(cb.ret_curr);
@@ -817,7 +817,7 @@ ERL_NIF_TERM cb_n1ql(ErlNifEnv* env, handle_t* handle, void* obj)
 
 error1:
     while(cb.ret_curr) {
-        struct libcouchbase_callback* node;
+        struct libcouchbase_callback_n1ql_data* node;
         node = cb.ret_curr->prev;
         free(cb.ret_curr->data);
         free(cb.ret_curr);

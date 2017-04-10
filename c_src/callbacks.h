@@ -9,8 +9,6 @@ struct libcouchbase_callback {
     size_t nkey;
     lcb_uint32_t flag;
     lcb_cas_t cas;
-    struct libcouchbase_callback* next;
-    struct libcouchbase_callback* prev;
 };
 
 struct libcouchbase_callback_http {
@@ -23,11 +21,23 @@ struct libcouchbase_callback_m {
     struct libcouchbase_callback** ret;
 };
 
+struct libcouchbase_callback_n1ql_data {
+    lcb_error_t error;
+    size_t size;
+    void *data;
+    void *key;
+    size_t nkey;
+    lcb_uint32_t flag;
+    lcb_cas_t cas;
+    struct libcouchbase_callback_n1ql_data* next;
+    struct libcouchbase_callback_n1ql_data* prev;
+};
+
 struct libcouchbase_callback_n1ql {
     int size;
-    struct libcouchbase_callback* ret_head;
-    struct libcouchbase_callback* ret_curr;
-    struct libcouchbase_callback* meta;
+    struct libcouchbase_callback_n1ql_data* ret_head;
+    struct libcouchbase_callback_n1ql_data* ret_curr;
+    struct libcouchbase_callback_n1ql_data* meta;
 };
 
 void get_callback(lcb_t instance,

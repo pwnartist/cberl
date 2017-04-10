@@ -120,10 +120,10 @@ void n1ql_callback(lcb_t instance,
                    const lcb_RESPN1QL *resp)
 {
     struct libcouchbase_callback_n1ql *cb;
-    struct libcouchbase_callback* node;
+    struct libcouchbase_callback_n1ql_data* node;
     cb = (struct libcouchbase_callback_n1ql *) ((lcb_RESPBASE *)resp)->cookie;
 
-    node = calloc(1, sizeof(struct libcouchbase_callback));
+    node = calloc(1, sizeof(struct libcouchbase_callback_n1ql_data));
     node->data = calloc(resp->nrow+1,sizeof(char));
     node->size = resp->nrow;
     memcpy(node->data, resp->row, resp->nrow);
